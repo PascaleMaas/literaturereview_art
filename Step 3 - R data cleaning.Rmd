@@ -1,0 +1,288 @@
+---
+title: "Step 3 - R data cleaning"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document:
+    latex_engine: xelatex
+---
+
+# Global settings
+
+## Clear work space and set global variables
+```{r global-options}
+# Clear memory
+rm(list=ls()) # Clear environmental variables
+gc() # memory garbage removal
+# set global options
+knitr::opts_chunk$set(fig.width=12, fig.height=8, warning=FALSE, message=FALSE)
+
+```
+
+## Load libaries 
+```{r load-packages}
+if(!require("pacman", quietly=T)) install.packages("pacman")
+pacman::p_load(osfr,tinytex,tidyverse,keyring,knitr,readxl,data.table,colorspace, lpSolve,irr,here,lme4,broom,psych,zoo,units,ggdist,cowplot,ggcorrplot,dplyr, patchwork, cowplot, ggpmisc, forcats, pwr, ggpmisc, simstudy, explore, car,VIM,mice,flextable,here, remotes,magrittr,reshape2,descr,table1,tableone,gmodels,xtable,lavaan,corrplot,caret,corrgram,Hmisc,polycor,lavaan,kableExtra,DiagrammeR,grid,Gmisc,epitools)
+```
+
+
+## Set up local tempfolder for raw and processed data files
+```{r local-tempfolder}
+# Get the path to the session's temporary directory
+session_temp_dir <- tempdir()
+
+# Define paths for the specific temporary subdirectories
+raw_data_dir <- file.path(session_temp_dir, "raw_data")
+processed_data_dir <- file.path(session_temp_dir, "processed_data")
+
+# Create the 'raw_data' subdirectory if it doesn't exist
+if (!dir.exists(raw_data_dir)) {
+  dir.create(raw_data_dir)
+}
+
+# Create the 'processed_data' subdirectory if it doesn't exist
+if (!dir.exists(processed_data_dir)) {
+  dir.create(processed_data_dir)
+}
+
+ 
+```
+
+
+## Authenticate R to OSF connection
+```{r osf-authentication}
+osf_auth(keyring :: key_get("osf"))
+```
+## OSF nodes
+```{r OSF-nodes}
+
+# Define OSF node IDs at the beginning
+# raw_data_node_id <- "yxsqb"   # Master Thesis Raw Data Node or other Raw Data Node
+# raw_data_node_id <- "gpj2v"  # https://osf.io/gpj2v/ Quantify Occupational Injury
+ raw_data_node_id <- "dpgby"  # https://osf.io/dpgby/ Art Business Education
+# raw_data_node_id <- "z6jfn" # https://osf.io/z6jfn/ Housing prices
+# raw_data_node_id <- "gu7ny" # https://osf.io/gu7ny/ Hmm53a-2425-GR1
+# raw_data_node_id <- "prw4a" # https://osf.io/prw4a/ Hmm53a-2425-GR2
+# raw_data_node_id <- "gxw3v" # https://osf.io/gxw3v/ Hmm53a-2425-GR3
+
+# processed_data_node_id <- "e4rdh"  # Master Thesis Processed Data Node 
+# processed_data_node_id <- "q4wgm"  # https://osf.io/q4wgm/ Quantify Occupational Injury
+ processed_data_node_id <- "akgf2"  # https://osf.io/akgf2/ Art Business Education
+# processed_data_node_id <- "6heqg"  # https://osf.io/6heqg/ Housing prices
+# processed_data_node_id <- "76tn5"  # https://osf.io/76tn5/ Hmm53a-2425-GR1
+# processed_data_node_id <- "ab6hg"  # https://osf.io/ab6hg/ Hmm53a-2425-GR2
+# processed_data_node_id <- "tyhbk"  # https://osf.io/tyhbk/ Hmm53a-2425-GR3 
+```
+
+# Download Zotero_SynthesisTable.csv 
+```{r get-processed-data-osf, echo=TRUE, include=TRUE, results='hide'}
+
+osf_retrieve_node(processed_data_node_id) %>%
+  osf_ls_files(pattern = "Zotero_SynthesisTable.csv") %>%
+   osf_download(path = raw_data_dir, conflicts="overwrite",progress=TRUE)
+
+```
+
+## Load Zotero tag export file into R data frame
+```{r list-csv-files}
+
+csv_file <- list.files(path = raw_data_dir, pattern = "\\.csv$", full.names = TRUE)
+
+if (length(csv_file) == 0) {
+  stop("Error: No csv file found in the specified directory.")
+}
+
+
+
+# standard pathname
+csv_file[1] <- file.path(dirname(csv_file[1]), basename(csv_file[1]))
+if (!file.exists(csv_file[1])) {
+  stop("File does not exist. Check the path.")
+}
+
+print(csv_file)
+```
+
+# Select first CSV file
+
+```{r load-csv-file}
+# Read the Markdown file
+Zotero_SynthesisTable <- read.csv(csv_file[1], encoding = "UTF-8")
+
+# Check if the file is empty
+if (length(Zotero_SynthesisTable) == 0) {
+  stop("Error: The csv file is empty.")
+}
+
+```
+
+########## manupulations 
+
+```{r rename dataset}
+# Rename the dataframe
+datacleaningtable <- Zotero_SynthesisTable
+```
+
+```{r remove columns}
+# Load necessary package
+library(dplyr)
+
+# Remove the column 'included_bibliometrics' if it exists
+datacleaningtable <- datacleaningtable %>% select(-included_metaanalysis, -concept)
+
+# Print the updated dataframe
+print(datacleaningtable)
+```
+
+```{r merge to new}
+# Load necessary library
+library(dplyr)
+
+# Define column groups for merging
+columns_methods <- c("method_arts", "method_theoretical", "method_qualitative", 
+                     "method_quantitative", "method_mixed", "method_pre_post", 
+                     "method_baseline_group", "method_literaturereview")
+
+columns_limitations <- c("limitation_other", "limitation_descriptive", 
+                         "limitation_research", "limitation_poor_research")
+
+columns_disciplines <- c("discipline_leadership", "discipline_entrepreneurship", 
+                         "discipline_management", "discipline_arts", 
+                         "discipline_interdisciplinairy", "discipline_marketing", "discipline_sustainability")
+
+columns_objectives <- c("aim", "research_question", "hypothesis")
+
+columns_location <- c("location_europe", "location_america", "location_asia", "location_southamerica")
+
+columns_results <- c("result_teaching", "result_proces", "result_motivation", 
+                     "result_outcome", "result_perspective", 
+                     "result_organisational_outcome")
+
+columns_collected <- c("seed_paper", "second_batch", "included_biblimetrics", 
+                       "first_batch", "included_business")
+
+columns_source <- c("source_measure", "source_business", "source_artbasedmethod", 
+                    "source_vangogh", "source_creativity", "source_slr")
+
+columns_educationtype <- c("k12_education", "social_sustainability_education", "higher_education")
+
+# Function to merge selected columns into one while keeping column names
+merge_columns <- function(df, new_column, old_columns) {
+  df %>%
+    mutate(!!new_column := apply(.[old_columns], 1, function(x) {
+      paste(names(x)[!is.na(x) & x != ""], x[!is.na(x) & x != ""], sep = ": ", collapse = "; ")
+    })) %>%
+    select(-all_of(old_columns))  # Remove old columns
+}
+
+# Apply merging function to each group
+datacleaningtable <- datacleaningtable %>%
+  merge_columns("methods", columns_methods) %>%
+  merge_columns("limitations", columns_limitations) %>%
+  merge_columns("disciplines", columns_disciplines) %>%
+  merge_columns("objectives", columns_objectives) %>%
+  merge_columns("location", columns_location) %>%
+  merge_columns("results", columns_results) %>%
+  merge_columns("collected", columns_collected) %>%
+  merge_columns("source", columns_source) %>%
+  merge_columns("educationtype", columns_educationtype)
+
+# Display only the 'year' column along with all newly created columns
+print(datacleaningtable %>% select(methods, limitations, disciplines, objectives, 
+                                   location, results, collected, source, educationtype), width = Inf)
+
+```
+
+```{r merge existing columns}
+# Load necessary library
+library(dplyr)
+
+# Function to merge selected columns into an existing column while keeping column names
+merge_into_existing_column <- function(df, existing_column, new_columns) {
+  existing_cols <- intersect(new_columns, colnames(df))  # Keep only existing columns
+
+  if (length(existing_cols) > 0) {  # Only proceed if columns exist
+    df <- df %>%
+      mutate(!!existing_column := apply(.[c(existing_column, existing_cols)], 1, function(x) {
+        paste(names(x)[!is.na(x) & x != ""], x[!is.na(x) & x != ""], sep = ": ", collapse = "; ")
+      })) %>%
+      select(-all_of(existing_cols))  # Remove merged columns
+  }
+  
+  return(df)
+}
+
+# Apply merging function to move columns under existing ones
+datacleaningtable <- datacleaningtable %>%
+  merge_into_existing_column("error", c("question")) %>%
+  merge_into_existing_column("artform", c("art_making", "illustration_of_essence", "skill_transfer")) %>%
+  merge_into_existing_column("theory", c("educational_theory", "scientific_explanation", "educational_the"))
+
+# Display updated dataset
+print(datacleaningtable %>% select(error, artform, theory), width = Inf)
+```
+
+```{r rename columns}
+
+# Define the desired column order (assuming the dataframe already has 'author' as desired)
+desired_order <- c("title", "author", "collected", "NoTag", "source", 
+                   "objectives", "methods", "data_collection", "number", "participants", 
+                   "data_analysis", "case", "disciplines", "location", "educationtype", 
+                   "business_context", "artform", "reason_art", "learning_outcome", 
+                   "outcome_organisation", "theory", "interesting_perspective", 
+                   "consideration_research", "consideration_teaching", "consideration_business", 
+                   "recommendation_teaching", "recommendation_business", 
+                   "recommendation_research", "limitations", "future_research")
+
+# Reorder columns with the unmentioned ones appended at the end.
+datacleaningtable20250326 <- datacleaningtable %>%
+  select(all_of(intersect(desired_order, colnames(.))),
+         everything())
+
+# Remove duplicate columns in case any appear twice.
+datacleaningtable20250326 <- datacleaningtable20250326[, !duplicated(names(datacleaningtable20250326))]
+
+# Display the updated dataframe
+print(datacleaningtable20250326, width = Inf)
+
+```
+
+```{r}
+# Load the necessary package
+library(openxlsx)
+
+# Define the file path
+file_path <- "/Users/Accounttijdelijk/Desktop/datacleaningtable20250326.xlsx"
+
+# Create a new workbook and add a worksheet
+wb <- createWorkbook()
+addWorksheet(wb, "Sheet1")
+
+# Write the data to the worksheet
+writeData(wb, sheet = "Sheet1", datacleaningtable20250326)
+
+# Define style for NA or empty cells
+na_style <- createStyle(fgFill = "#FFD1D1")  # light red background
+
+# Loop through each cell and apply style if it's NA or empty string
+for (i in 1:nrow(datacleaningtable20250326)) {
+  for (j in 1:ncol(datacleaningtable20250326)) {
+    value <- datacleaningtable20250326[i, j]
+    if (is.na(value) || trimws(as.character(value)) == "") {
+      addStyle(wb, sheet = "Sheet1", style = na_style, rows = i + 1, cols = j, gridExpand = TRUE)
+    }
+  }
+}
+
+# Save the workbook
+saveWorkbook(wb, file = file_path, overwrite = TRUE)
+
+# Confirm the file was saved
+cat("File saved to:", file_path)
+
+
+```
+
+
+

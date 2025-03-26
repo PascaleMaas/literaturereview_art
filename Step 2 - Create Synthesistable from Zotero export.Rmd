@@ -2,7 +2,7 @@
 title: "Step 2 - Create Synthesistable from Zotero export"
 output:
   html_document:
-    df_print: paged
+    Zotero_tag_export_long_print: paged
   html_notebook: default
   pdf_document:
     latex_engine: xelatex
@@ -48,7 +48,6 @@ if (!dir.exists(processed_data_dir)) {
 
  
 ```
-
 
 ## Authenticate R to OSF connection
 ```{r osf-authentication}
@@ -115,3 +114,128 @@ if (length(Zotero_tag_export_long) == 0) {
 }
 
 ```
+
+########## own coding
+
+
+```{r put in one column}
+
+Zotero_tag_export_long <- Zotero_tag_export_long %>%
+  # Remove backslashes from the 'tag' column
+  mutate(tag = gsub("\\\\", "", tag)) %>%
+  # Update the annotation column by combining existing annotation, comment (if applicable), and page info
+  mutate(annotation = str_squish(
+    paste(
+      if_else(is.na(annotation), "", annotation),
+      if_else(comment != "No Comment", comment, ""),
+      paste0("(p.", page, ")")
+    )
+  )) %>%
+  # Remove the redundant page and comment columns
+  select(-page, -comment)
+
+# View the updated dataframe
+print(Zotero_tag_export_long)
+
+
+```
+
+
+
+```{r pivot table}
+
+Zotero_SynthesisTable <- Zotero_tag_export_long %>%
+  pivot_wider(
+    id_cols = c(title, author),
+    names_from = tag,
+    values_from = annotation,
+    values_fn = function(x) {
+      if(length(x) == 1) {
+        x
+      } else {
+        paste0('"', paste(x, collapse = '" "'), '"')
+      }
+    }
+  ) %>%
+  select(title, author, everything())
+
+# View the transformed dataframe
+print(Zotero_SynthesisTable)
+
+```
+
+
+##### storage and cleaning
+
+# Upload Zotero tag export long data file to OSF
+## Save Zotero tag export long data frame to local processed_data_dir folder
+```{r save_data}
+
+# Define the full path for the output CSV file
+output_file <- file.path(processed_data_dir, "Zotero_SynthesisTable.csv")
+
+write.csv(Zotero_SynthesisTable,output_file,row.names=FALSE)
+```
+
+## Upload Zotero tag export long file from local processed_data_dir to folder to OSF
+```{r file-to-osf, message=FALSE, include=FALSE}
+
+# List all CSV files in processed_data_dir
+csv_files <- list.files(processed_data_dir, pattern = "\\.csv$", full.names = TRUE)
+
+# upload the first csv file if there are many
+if (length(csv_files) == 0) {
+  stop("No CSV files found in processed_data_dir.")
+} else {
+  file_to_upload <- csv_files[1]
+}
+
+
+# Retrieve the processed_data node's meta data from OSF
+# ## Processed_data Node OSF project: Master Thesis: https://osf.io/e4rdh/
+# Art project https://osf.io/akgf2/
+procdata<- osf_retrieve_node(processed_data_node_id)
+osf_upload(procdata, path = file_to_upload, conflicts = "overwrite")
+
+```
+
+# Housekeeping
+
+## Delete files in local temp folder
+```{r Remove-local-temp-files,warning=FALSE, include=FALSE,  message=FALSE,eval=TRUE}
+# Pattern to match (e.g. all files that start with "SLR_")
+# file_pattern <- "^SLR_.*"
+ file_pattern <- "*.*"
+
+# List all files in temp directories that match this pattern
+raw_data_dir_files <- list.files(
+  path = raw_data_dir,
+  pattern = file_pattern,
+  full.names = TRUE
+)
+
+processed_data_dir_files <- list.files(
+  path = processed_data_dir,
+  pattern = file_pattern,
+  full.names = TRUE
+)
+
+# Remove them
+file.remove(raw_data_dir_files)
+file.remove(processed_data_dir_files)
+
+```
+
+## Delete local directories
+```{r delete-temp-directories}
+# Delete the raw_data_dir directory and its contents
+# unlink(file.path(tempdir(), "raw_data_dir"), recursive = TRUE)
+unlink(raw_data_dir, recursive = TRUE)
+
+# Delete the processed_data_dir directory and its contents
+# unlink(file.path(tempdir(), "processed_data_dir"), recursive = TRUE)
+unlink(processed_data_dir, recursive = TRUE)
+
+```
+
+

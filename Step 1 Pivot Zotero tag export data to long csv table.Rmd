@@ -83,7 +83,7 @@ osf_auth(keyring :: key_get("osf"))
 ```{r get-md-raw-data-osf, echo=TRUE, include=TRUE, results='hide'}
 
 osf_retrieve_node(raw_data_node_id) %>%
-  osf_ls_files(pattern = "2025-03-26-10-14-9IE3DZIS.md") %>%
+  osf_ls_files(pattern = " Details-by-Tag-(With-Images-&-Annotations-Only)-TMBCSQCI.md") %>%
    osf_download(path = raw_data_dir, conflicts="overwrite",progress=TRUE)
 ```
 
@@ -104,7 +104,7 @@ print(md_file)
 # Select the correct Markdown file
 if (length(md_file) == 1) {
   selected_md_file <- md_file  # Use the only available file
-} else if (any(basename(md_file) == "2025-03-26-10-14-9IE3DZIS.md")) {
+} else if (any(basename(md_file) == ".md")) {
   selected_md_file <- md_file[basename(md_file) == ".md"]  # Prioritize .md
 } else {
   stop("Error: Multiple Markdown (.md) files found, but '.md' is missing.")
@@ -130,14 +130,13 @@ cat("Loaded Markdown file:", selected_md_file, "\n")
 # Load required library
 library(stringr)
 
-# Initialize a dataframe to store parsed data (without type and color)
+# Initialize a dataframe to store parsed data (without type, color, or date)
 parsed_df <- data.frame(
   tag        = character(),
   page       = character(),
   comment    = character(),
   annotation = character(),
   author     = character(),
-  date       = character(),
   title      = character(),
   stringsAsFactors = FALSE
 )
@@ -150,12 +149,11 @@ warnings_count <- 0  # Initialize warning counter
 # Regular expression pattern for tag headings remains the same
 tag_pattern <- "^### Tag: (.+)$"
 
-# Updated metadata pattern without Type and Color:
+# Updated metadata pattern without Type, Color, or Date:
 metadata_pattern <- "\\*\\*Page:\\*\\*\\s*([^|]+)\\s*\\|\\s*"
 metadata_pattern <- paste0(metadata_pattern, "\\*\\*Comment:\\*\\*\\s*([^|]*)\\s*\\|\\s*")  
 metadata_pattern <- paste0(metadata_pattern, "\\*\\*Annotation:\\*\\*\\s*(?:\"(.*?)\"|([^|]*))\\s*\\|\\s*")  
 metadata_pattern <- paste0(metadata_pattern, "\\*\\*Author:\\*\\*\\s*([^|]*)\\s*\\|\\s*")  
-metadata_pattern <- paste0(metadata_pattern, "\\*\\*Date:\\*\\*\\s*\\((.*?)\\)\\s*\\|\\s*")  
 metadata_pattern <- paste0(metadata_pattern, "\\*\\*Title:\\*\\*\\s*(.*)$")  
 
 # **Step 1: Find the first occurrence of "### Tag:"**
@@ -186,7 +184,7 @@ for (line in md_lines) {
   # Check if the pattern matched (metadata_match[2] holds the Page field)
   if (!is.na(metadata_match[2])) {
     
-    # Extract annotation text: prefer the first alternative (group 3), fallback to group 4 if needed
+    # Extract annotation text: prefer the first alternative (group 4), fallback to group 5 if needed
     extracted_annotation <- ifelse(!is.na(metadata_match[4]) && metadata_match[4] != "", 
                                    metadata_match[4], 
                                    metadata_match[5])
@@ -199,8 +197,7 @@ for (line in md_lines) {
         comment    = ifelse(trimws(metadata_match[3]) == "", "No Comment", trimws(metadata_match[3])),
         annotation = ifelse(trimws(extracted_annotation) == "", "No Annotation", trimws(extracted_annotation)),
         author     = ifelse(trimws(metadata_match[6]) == "", "Unknown Author", trimws(metadata_match[6])),
-        date       = trimws(metadata_match[7]),
-        title      = trimws(metadata_match[8]),
+        title      = trimws(metadata_match[7]),
         stringsAsFactors = FALSE
       )
     )
@@ -223,7 +220,6 @@ if (warnings_count > 0) {
 
 # Display the extracted dataframe (Optional)
 # print(parsed_df)
-
 ```
 
 ```{r bind-df}
