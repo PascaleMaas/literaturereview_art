@@ -1,0 +1,339 @@
+---
+title: "Step 1 Pivot Zotero tag export data to long csv table"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document:
+    latex_engine: xelatex
+---
+
+# Global settings 
+
+
+## Clear work space and set global variables
+```{r global-options}
+# Clear memory
+rm(list=ls())
+# set global options
+knitr::opts_chunk$set(fig.width=12, fig.height=8, warning=FALSE, message=FALSE)
+
+```
+
+## Load libaries 
+```{r load-packages}
+if(!require("pacman", quietly=T)) install.packages("pacman")
+pacman::p_load(osfr,tinytex,tidyverse,keyring,knitr,readxl,data.table, lpSolve,irr,here,lme4,broom,psych,zoo,units,ggdist,cowplot,ggcorrplot,dplyr, patchwork, cowplot, ggpmisc, forcats, pwr, ggpmisc, simstudy, explore, car,VIM,mice,flextable,here, remotes,magrittr,reshape2,descr,table1,tableone,gmodels,xtable,lavaan,corrplot,caret,corrgram,Hmisc,polycor,lavaan,kableExtra,DiagrammeR,grid,Gmisc,epitools)
+```
+
+
+## Set up local tempfolder for raw and processed data files
+```{r local-tempfolder}
+# Get the path to the session's temporary directory
+session_temp_dir <- tempdir()
+
+# Define paths for the specific temporary subdirectories
+raw_data_dir <- file.path(session_temp_dir, "raw_data")
+processed_data_dir <- file.path(session_temp_dir, "processed_data")
+
+# Create the 'raw_data' subdirectory if it doesn't exist
+if (!dir.exists(raw_data_dir)) {
+  dir.create(raw_data_dir)
+}
+
+# Create the 'processed_data' subdirectory if it doesn't exist
+if (!dir.exists(processed_data_dir)) {
+  dir.create(processed_data_dir)
+}
+
+ 
+```
+
+
+## Authenticate R to OSF connection
+```{r osf-authentication}
+osf_auth(keyring :: key_get("osf"))
+```
+## OSF nodes
+```{r OSF-nodes}
+
+# Define OSF node IDs at the beginning
+# raw_data_node_id <- "yxsqb"   # Master Thesis Raw Data Node or other Raw Data Node
+# raw_data_node_id <- "gpj2v"  # https://osf.io/gpj2v/ Quantify Occupational Injury
+ raw_data_node_id <- "dpgby"  # https://osf.io/dpgby/ Art Business Education
+# raw_data_node_id <- "z6jfn" # https://osf.io/z6jfn/ Housing prices
+# raw_data_node_id <- "gu7ny" # https://osf.io/gu7ny/ Hmm53a-2425-GR1
+# raw_data_node_id <- "prw4a" # https://osf.io/prw4a/ Hmm53a-2425-GR2
+# raw_data_node_id <- "gxw3v" # https://osf.io/gxw3v/ Hmm53a-2425-GR3
+
+# processed_data_node_id <- "e4rdh"  # Master Thesis Processed Data Node 
+# processed_data_node_id <- "q4wgm"  # https://osf.io/q4wgm/ Quantify Occupational Injury
+ processed_data_node_id <- "akgf2"  # https://osf.io/akgf2/ Art Business Education
+# processed_data_node_id <- "6heqg"  # https://osf.io/6heqg/ Housing prices
+# processed_data_node_id <- "76tn5"  # https://osf.io/76tn5/ Hmm53a-2425-GR1
+# processed_data_node_id <- "ab6hg"  # https://osf.io/ab6hg/ Hmm53a-2425-GR2
+# processed_data_node_id <- "tyhbk"  # https://osf.io/tyhbk/ Hmm53a-2425-GR3 
+
+```
+
+
+
+
+# Download Zotero md export file from OSF
+```{r get-md-raw-data-osf, echo=TRUE, include=TRUE, results='hide'}
+
+osf_retrieve_node(raw_data_node_id) %>%
+  osf_ls_files(pattern = "2025-03-26-10-14-9IE3DZIS.md") %>%
+   osf_download(path = raw_data_dir, conflicts="overwrite",progress=TRUE)
+```
+
+## Load Zotero tag export file into R data frame
+```{r list-md-files}
+md_file <- list.files(path = raw_data_dir, pattern = "\\.md$", full.names = TRUE)
+
+if (length(md_file) == 0) {
+  stop("Error: No Markdown file found in the specified directory.")
+}
+
+print(md_file)
+```
+
+# Select first MD file
+
+```{r load-md-file}
+# Select the correct Markdown file
+if (length(md_file) == 1) {
+  selected_md_file <- md_file  # Use the only available file
+} else if (any(basename(md_file) == "2025-03-26-10-14-9IE3DZIS.md")) {
+  selected_md_file <- md_file[basename(md_file) == ".md"]  # Prioritize .md
+} else {
+  stop("Error: Multiple Markdown (.md) files found, but '.md' is missing.")
+}
+
+# Read the selected Markdown file
+md_lines <- readLines(selected_md_file, encoding = "UTF-8", warn = FALSE)
+
+# Check if the file is empty
+if (length(md_lines) == 0) {
+  stop("Error: The Markdown file is empty.")
+}
+
+# Print the selected file for confirmation
+cat("Loaded Markdown file:", selected_md_file, "\n")
+
+```
+
+
+# Extract tags, comments, and annotation from highlights
+
+```{r extraction-tag-annotation-comment}
+# Load required library
+library(stringr)
+
+# Initialize a dataframe to store parsed data (without type and color)
+parsed_df <- data.frame(
+  tag        = character(),
+  page       = character(),
+  comment    = character(),
+  annotation = character(),
+  author     = character(),
+  date       = character(),
+  title      = character(),
+  stringsAsFactors = FALSE
+)
+
+# Create or clear a warnings log file
+warnings_file <- "warnings_log.txt"
+writeLines("", warnings_file)  # Clears the file before appending
+warnings_count <- 0  # Initialize warning counter
+
+# Regular expression pattern for tag headings remains the same
+tag_pattern <- "^### Tag: (.+)$"
+
+# Updated metadata pattern without Type and Color:
+metadata_pattern <- "\\*\\*Page:\\*\\*\\s*([^|]+)\\s*\\|\\s*"
+metadata_pattern <- paste0(metadata_pattern, "\\*\\*Comment:\\*\\*\\s*([^|]*)\\s*\\|\\s*")  
+metadata_pattern <- paste0(metadata_pattern, "\\*\\*Annotation:\\*\\*\\s*(?:\"(.*?)\"|([^|]*))\\s*\\|\\s*")  
+metadata_pattern <- paste0(metadata_pattern, "\\*\\*Author:\\*\\*\\s*([^|]*)\\s*\\|\\s*")  
+metadata_pattern <- paste0(metadata_pattern, "\\*\\*Date:\\*\\*\\s*\\((.*?)\\)\\s*\\|\\s*")  
+metadata_pattern <- paste0(metadata_pattern, "\\*\\*Title:\\*\\*\\s*(.*)$")  
+
+# **Step 1: Find the first occurrence of "### Tag:"**
+start_index <- which(grepl(tag_pattern, md_lines))[1]
+
+if (is.na(start_index)) {
+  stop("Error: No '### Tag:' found in the file.")
+}
+
+# Process only the relevant portion of the file
+md_lines <- md_lines[start_index:length(md_lines)]
+
+# Track current tag
+current_tag <- NA
+
+# Iterate over relevant lines
+for (line in md_lines) {
+  
+  # Detect tag headings
+  if (grepl(tag_pattern, line)) {
+    current_tag <- sub(tag_pattern, "\\1", line)
+    next
+  }
+  
+  # Extract metadata using the updated pattern
+  metadata_match <- str_match(line, metadata_pattern)
+  
+  # Check if the pattern matched (metadata_match[2] holds the Page field)
+  if (!is.na(metadata_match[2])) {
+    
+    # Extract annotation text: prefer the first alternative (group 3), fallback to group 4 if needed
+    extracted_annotation <- ifelse(!is.na(metadata_match[4]) && metadata_match[4] != "", 
+                                   metadata_match[4], 
+                                   metadata_match[5])
+    
+    parsed_df <- rbind(
+      parsed_df,
+      data.frame(
+        tag        = ifelse(is.na(current_tag), "NO TAG", current_tag),
+        page       = trimws(metadata_match[2]),
+        comment    = ifelse(trimws(metadata_match[3]) == "", "No Comment", trimws(metadata_match[3])),
+        annotation = ifelse(trimws(extracted_annotation) == "", "No Annotation", trimws(extracted_annotation)),
+        author     = ifelse(trimws(metadata_match[6]) == "", "Unknown Author", trimws(metadata_match[6])),
+        date       = trimws(metadata_match[7]),
+        title      = trimws(metadata_match[8]),
+        stringsAsFactors = FALSE
+      )
+    )
+  } else {
+    # Log warnings for lines that don't parse (ignoring empty lines)
+    if (trimws(line) != "") {
+      warning_message <- paste("⚠ Warning: Failed to parse metadata in line:", line, "\n")
+      cat(warning_message, file = warnings_file, append = TRUE, sep = "\n")
+      warnings_count <- warnings_count + 1
+    }
+  }
+}
+
+# Log the total warnings count
+if (warnings_count > 0) {
+  cat(sprintf("⚠ %d warnings logged in %s\n", warnings_count, warnings_file))
+} else {
+  cat("✅ No warnings encountered during extraction.\n")
+}
+
+# Display the extracted dataframe (Optional)
+# print(parsed_df)
+
+```
+
+```{r bind-df}
+
+# Combine parsed_df and image_df by stacking rows
+#Zotero_tag_export_long <- bind_rows(parsed_df, image_df)
+Zotero_tag_export_long <- parsed_df
+
+```
+
+
+
+# QAQC: Basic Tag summary 
+Top 20 Tags by Count: This table displays the top 20 tags, sorted by the number of times each tag occurs.
+Top 20 Tags Alphabetically Sorted: This table presents the top 20 tags, arranged in alphabetical order.
+
+```{r tag-summaries}
+# Count the occurrences of each tag
+tag_summary <- Zotero_tag_export_long %>%
+  count(tag, name = "frequency")
+
+# Sort by frequency in descending order
+tag_sorted_by_frequency <- tag_summary %>%
+  arrange(desc(frequency)) %>%
+  slice_head(n = 20)
+
+# Sort alphabetically by tag name
+tag_sorted_alphabetically <- tag_summary %>%
+  arrange(tag) %>%
+  slice_head(n = 20)
+
+# View tags sorted by frequency
+print(tag_sorted_by_frequency)
+
+# View tags sorted alphabetically
+print(tag_sorted_alphabetically)
+
+
+```
+
+
+# Upload Zotero tag export long data file to OSF
+## Save Zotero tag export long data frame to local processed_data_dir folder
+```{r save_data}
+
+# Define the full path for the output CSV file
+output_file <- file.path(processed_data_dir, "Zotero_tag_export_long.csv")
+
+write.csv(Zotero_tag_export_long,output_file,row.names=FALSE)
+```
+
+## Upload Zotero tag export long file from local processed_data_dir to folder to OSF
+```{r file-to-osf, message=FALSE, include=FALSE}
+
+# List all CSV files in processed_data_dir
+csv_files <- list.files(processed_data_dir, pattern = "\\.csv$", full.names = TRUE)
+
+# upload the first csv file if there are many
+if (length(csv_files) == 0) {
+  stop("No CSV files found in processed_data_dir.")
+} else {
+  file_to_upload <- csv_files[1]
+}
+
+
+# Retrieve the processed_data node's meta data from OSF
+# ## Processed_data Node OSF project: Master Thesis: https://osf.io/e4rdh/
+# Art project https://osf.io/akgf2/
+procdata<- osf_retrieve_node(processed_data_node_id)
+osf_upload(procdata, path = file_to_upload, conflicts = "overwrite")
+
+```
+
+# Housekeeping
+## Delete files in local temp folder
+```{r Remove-local-temp-files,warning=FALSE, include=FALSE,  message=FALSE,eval=FALSE}
+# Pattern to match (e.g. all files that start with "SLR_")
+# file_pattern <- "^SLR_.*"
+ file_pattern <- "*.*"
+
+# List all files in temp directories that match this pattern
+raw_data_dir_files <- list.files(
+  path = raw_data_dir,
+  pattern = file_pattern,
+  full.names = TRUE
+)
+
+processed_data_dir_files <- list.files(
+  path = processed_data_dir,
+  pattern = file_pattern,
+  full.names = TRUE
+)
+
+# Remove them
+file.remove(raw_data_dir_files)
+file.remove(processed_data_dir_files)
+
+```
+
+## Delete local directories
+```{r delete-temp-directories}
+# Delete the raw_data_dir directory and its contents
+# unlink(file.path(tempdir(), "raw_data_dir"), recursive = TRUE)
+unlink(raw_data_dir, recursive = TRUE)
+
+# Delete the processed_data_dir directory and its contents
+# unlink(file.path(tempdir(), "processed_data_dir"), recursive = TRUE)
+unlink(processed_data_dir, recursive = TRUE)
+
+```
+
+
+
