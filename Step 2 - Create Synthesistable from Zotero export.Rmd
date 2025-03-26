@@ -1,0 +1,117 @@
+---
+title: "Step 2 - Create Synthesistable from Zotero export"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document:
+    latex_engine: xelatex
+---
+
+# Global settings
+
+## Clear work space and set global variables
+```{r global-options}
+# Clear memory
+rm(list=ls()) # Clear environmental variables
+gc() # memory garbage removal
+# set global options
+knitr::opts_chunk$set(fig.width=12, fig.height=8, warning=FALSE, message=FALSE)
+
+```
+
+## Load libaries 
+```{r load-packages}
+if(!require("pacman", quietly=T)) install.packages("pacman")
+pacman::p_load(osfr,tinytex,tidyverse,keyring,knitr,readxl,data.table,colorspace, lpSolve,irr,here,lme4,broom,psych,zoo,units,ggdist,cowplot,ggcorrplot,dplyr, patchwork, cowplot, ggpmisc, forcats, pwr, ggpmisc, simstudy, explore, car,VIM,mice,flextable,here, remotes,magrittr,reshape2,descr,table1,tableone,gmodels,xtable,lavaan,corrplot,caret,corrgram,Hmisc,polycor,lavaan,kableExtra,DiagrammeR,grid,Gmisc,epitools)
+```
+
+
+## Set up local tempfolder for raw and processed data files
+```{r local-tempfolder}
+# Get the path to the session's temporary directory
+session_temp_dir <- tempdir()
+
+# Define paths for the specific temporary subdirectories
+raw_data_dir <- file.path(session_temp_dir, "raw_data")
+processed_data_dir <- file.path(session_temp_dir, "processed_data")
+
+# Create the 'raw_data' subdirectory if it doesn't exist
+if (!dir.exists(raw_data_dir)) {
+  dir.create(raw_data_dir)
+}
+
+# Create the 'processed_data' subdirectory if it doesn't exist
+if (!dir.exists(processed_data_dir)) {
+  dir.create(processed_data_dir)
+}
+
+ 
+```
+
+
+## Authenticate R to OSF connection
+```{r osf-authentication}
+osf_auth(keyring :: key_get("osf"))
+```
+## OSF nodes
+```{r OSF-nodes}
+
+# Define OSF node IDs at the beginning
+# raw_data_node_id <- "yxsqb"   # Master Thesis Raw Data Node or other Raw Data Node
+# raw_data_node_id <- "gpj2v"  # https://osf.io/gpj2v/ Quantify Occupational Injury
+ raw_data_node_id <- "dpgby"  # https://osf.io/dpgby/ Art Business Education
+# raw_data_node_id <- "z6jfn" # https://osf.io/z6jfn/ Housing prices
+# raw_data_node_id <- "gu7ny" # https://osf.io/gu7ny/ Hmm53a-2425-GR1
+# raw_data_node_id <- "prw4a" # https://osf.io/prw4a/ Hmm53a-2425-GR2
+# raw_data_node_id <- "gxw3v" # https://osf.io/gxw3v/ Hmm53a-2425-GR3
+
+# processed_data_node_id <- "e4rdh"  # Master Thesis Processed Data Node 
+# processed_data_node_id <- "q4wgm"  # https://osf.io/q4wgm/ Quantify Occupational Injury
+ processed_data_node_id <- "akgf2"  # https://osf.io/akgf2/ Art Business Education
+# processed_data_node_id <- "6heqg"  # https://osf.io/6heqg/ Housing prices
+# processed_data_node_id <- "76tn5"  # https://osf.io/76tn5/ Hmm53a-2425-GR1
+# processed_data_node_id <- "ab6hg"  # https://osf.io/ab6hg/ Hmm53a-2425-GR2
+# processed_data_node_id <- "tyhbk"  # https://osf.io/tyhbk/ Hmm53a-2425-GR3 
+```
+
+# Download Zotero_tag_export_long.csv 
+```{r get-processed-data-osf, echo=TRUE, include=TRUE, results='hide'}
+
+osf_retrieve_node(processed_data_node_id) %>%
+  osf_ls_files(pattern = "Zotero_tag_export_long.csv") %>%
+   osf_download(path = raw_data_dir, conflicts="overwrite",progress=TRUE)
+```
+
+## Load Zotero tag export file into R data frame
+```{r list-csv-files}
+
+csv_file <- list.files(path = raw_data_dir, pattern = "\\.csv$", full.names = TRUE)
+
+if (length(csv_file) == 0) {
+  stop("Error: No csv file found in the specified directory.")
+}
+
+
+
+# standard pathname
+csv_file[1] <- file.path(dirname(csv_file[1]), basename(csv_file[1]))
+if (!file.exists(csv_file[1])) {
+  stop("File does not exist. Check the path.")
+}
+
+print(csv_file)
+```
+
+# Select first CSV file
+
+```{r load-csv-file}
+# Read the Markdown file
+Zotero_tag_export_long <- read.csv(csv_file[1], encoding = "UTF-8")
+
+# Check if the file is empty
+if (length(Zotero_tag_export_long) == 0) {
+  stop("Error: The csv file is empty.")
+}
+
+```
