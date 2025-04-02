@@ -120,23 +120,20 @@ if (length(Zotero_tag_export_long) == 0) {
 
 ```{r put in one column}
 
-Zotero_tag_export_long <- Zotero_tag_export_long %>%
-  # Remove backslashes from the 'tag' column
-  mutate(tag = gsub("\\\\", "", tag)) %>%
-  # Update the annotation column by combining existing annotation, comment (if applicable), and page info
-  mutate(annotation = str_squish(
-    paste(
-      if_else(is.na(annotation), "", annotation),
-      if_else(comment != "No Comment", comment, ""),
-      paste0("(p.", page, ")")
-    )
-  )) %>%
-  # Remove the redundant page and comment columns
-  select(-page, -comment)
-
-# View the updated dataframe
-print(Zotero_tag_export_long)
-
+df_wide <- Zotero_tag_export_long %>%
+  pivot_wider(
+    id_cols = c(title, author),
+    names_from = tag,
+    values_from = annotation,
+    values_fn = function(x) {
+      if(length(x) == 1) {
+        x
+      } else {
+        paste0('"', paste(x, collapse = '" "'), '"')
+      }
+    }
+  ) %>%
+  select(title, author, everything())
 
 ```
 

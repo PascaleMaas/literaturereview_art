@@ -83,7 +83,7 @@ osf_auth(keyring :: key_get("osf"))
 ```{r get-md-raw-data-osf, echo=TRUE, include=TRUE, results='hide'}
 
 osf_retrieve_node(raw_data_node_id) %>%
-  osf_ls_files(pattern = " Details-by-Tag-(With-Images-&-Annotations-Only)-TMBCSQCI.md") %>%
+  osf_ls_files(pattern = "2.4.2025-GZUN3R8B.md") %>%
    osf_download(path = raw_data_dir, conflicts="overwrite",progress=TRUE)
 ```
 
