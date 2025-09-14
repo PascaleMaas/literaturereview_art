@@ -58,24 +58,13 @@ osf_auth(keyring :: key_get("osf"))
 ```{r OSF-nodes}
 
 # Define OSF node IDs at the beginning
-# raw_data_node_id <- "yxsqb"   # Master Thesis Raw Data Node or other Raw Data Node
-# raw_data_node_id <- "gpj2v"  # https://osf.io/gpj2v/ Quantify Occupational Injury
+# raw_data_node_id <- "XXXX"  # https://osf.io/XXXX/ XXXX
  raw_data_node_id <- "dpgby"  # https://osf.io/dpgby/ Art Business Education
-# raw_data_node_id <- "z6jfn" # https://osf.io/z6jfn/ Housing prices
-# raw_data_node_id <- "gu7ny" # https://osf.io/gu7ny/ Hmm53a-2425-GR1
-# raw_data_node_id <- "prw4a" # https://osf.io/prw4a/ Hmm53a-2425-GR2
-# raw_data_node_id <- "gxw3v" # https://osf.io/gxw3v/ Hmm53a-2425-GR3
 
-# processed_data_node_id <- "e4rdh"  # Master Thesis Processed Data Node 
-# processed_data_node_id <- "q4wgm"  # https://osf.io/q4wgm/ Quantify Occupational Injury
+# processed_data_node_id <- "XXXX"  # https://osf.io/XXXX/ XXXX
  processed_data_node_id <- "akgf2"  # https://osf.io/akgf2/ Art Business Education
-# processed_data_node_id <- "6heqg"  # https://osf.io/6heqg/ Housing prices
-# processed_data_node_id <- "76tn5"  # https://osf.io/76tn5/ Hmm53a-2425-GR1
-# processed_data_node_id <- "ab6hg"  # https://osf.io/ab6hg/ Hmm53a-2425-GR2
-# processed_data_node_id <- "tyhbk"  # https://osf.io/tyhbk/ Hmm53a-2425-GR3 
 
 ```
-
 
 
 
@@ -83,7 +72,7 @@ osf_auth(keyring :: key_get("osf"))
 ```{r get-md-raw-data-osf, echo=TRUE, include=TRUE, results='hide'}
 
 osf_retrieve_node(raw_data_node_id) %>%
-  osf_ls_files(pattern = "2.4.2025-GZUN3R8B.md") %>%
+  osf_ls_files(pattern = "11.09.2025.md") %>%
    osf_download(path = raw_data_dir, conflicts="overwrite",progress=TRUE)
 ```
 

@@ -130,46 +130,31 @@ colnames(datacleaningtable) <- gsub("\\.", "", colnames(datacleaningtable))
 ```
 
 
-```{r remove columns}
-# Load necessary package
-library(dplyr)
+```{r alfabtic order columns}
+# new order
+datacleaningtable <- datacleaningtable[, order(colnames(datacleaningtable))]
 
-# Remove the column 'included_bibliometrics' if it exists
-datacleaningtable <- datacleaningtable %>% select(-included_metaanalysis, -concept)
-
-# Print the updated dataframe
-print(datacleaningtable)
 ```
 
 ```{r merge to new}
-# Load necessary library
-library(dplyr)
 
 # Define column groups for merging
-columns_methods <- c("method_arts", "method_theoretical", "method_qualitative","method_quantitative", "method_mixed", "method_pre_post","method_baseline_group", "method_literaturereview")
+columns_methods <- c("method_qualitative","method_quantitative", "method_mixed")
 
-columns_limitations <- c("limitation_other", "limitation_descriptive", 
-                         "limitation_research", "limitation_poor_research")
+columns_disciplines <- c("discipline_accountant", "discipline_arts","discipline_economics", "discipline_entrepreneurship", "discipline_ethics", "discipline_interdisciplinairy", "discipline_innovation", "discipline_leadership", "discipline_management", "discipline_marketing", "discipline_sustainability", "discipline_strategy", "discipline_changemanagement")
 
-columns_disciplines <- c("discipline_leadership", "discipline_entrepreneurship", 
-                         "discipline_management", "discipline_arts", 
-                         "discipline_interdisciplinairy", "discipline_marketing", "discipline_sustainability")
+columns_context <- c("business_context", "higher_education")
 
 columns_objectives <- c("aim", "research_question", "hypothesis")
 
-columns_location <- c("location_europe", "location_america", "location_asia", "location_southamerica")
+columns_locations <- c("location_europe", "location_nordamerica", "location_asia", "location_southamerica", "location_online", "location_australia", "location_europe_secundary")
+
+columns_intergration <- c("artsrelated", "artsbased", "artsinformed")
 
 columns_results <- c("result_teaching", "result_proces", "result_motivation", 
                      "result_outcome", "result_perspective", 
                      "result_organisational_outcome")
 
-columns_collected <- c("seed_paper", "second_batch", "included_biblimetrics", 
-                       "first_batch", "included_business")
-
-columns_source <- c("source_measure", "source_business", "source_artbasedmethod", 
-                    "source_vangogh", "source_creativity", "source_slr")
-
-columns_educationtype <- c("k12_education", "social_sustainability_education", "higher_education")
 
 # Function to merge selected columns into one while keeping column names
 merge_columns <- function(df, new_column, old_columns) {
@@ -183,107 +168,68 @@ merge_columns <- function(df, new_column, old_columns) {
 # Apply merging function to each group
 datacleaningtable <- datacleaningtable %>%
   merge_columns("methods", columns_methods) %>%
-  merge_columns("limitations", columns_limitations) %>%
   merge_columns("disciplines", columns_disciplines) %>%
+  merge_columns("context", columns_context) %>%
   merge_columns("objectives", columns_objectives) %>%
-  merge_columns("location", columns_location) %>%
-  merge_columns("results", columns_results) %>%
-  merge_columns("collected", columns_collected) %>%
-  merge_columns("source", columns_source) %>%
-  merge_columns("educationtype", columns_educationtype)
+  merge_columns("locations", columns_locations) %>%
+  merge_columns("intergration", columns_intergration) %>%
+  merge_columns("results", columns_results)
 
-# Display only the 'year' column along with all newly created columns
-print(datacleaningtable %>% select(methods, limitations, disciplines, objectives, 
-                                   location, results, collected, source, educationtype), width = Inf)
+# Display only the all newly created columns
+print(datacleaningtable %>% select(methods, disciplines, context, 
+                                   objectives, locations, intergration, results), width = Inf)
 
 ```
 
-```{r merge existing columns}
-# Load necessary library
-library(dplyr)
 
-# Function to merge selected columns into an existing column while keeping column names
-merge_into_existing_column <- function(df, existing_column, new_columns) {
-  existing_cols <- intersect(new_columns, colnames(df))  # Keep only existing columns
+```{r reorder}
+# Reorder columns: title first, then the merged ones, then everything else
+new_cols <- c("methods", "disciplines", "context", 
+              "objectives", "locations", "intergration", "results")
 
-  if (length(existing_cols) > 0) {  # Only proceed if columns exist
-    df <- df %>%
-      mutate(!!existing_column := apply(.[c(existing_column, existing_cols)], 1, function(x) {
-        paste(names(x)[!is.na(x) & x != ""], x[!is.na(x) & x != ""], sep = ": ", collapse = "; ")
-      })) %>%
-      select(-all_of(existing_cols))  # Remove merged columns
-  }
-  
-  return(df)
+datacleaningtable <- datacleaningtable %>%
+  select(title, author, all_of(new_cols), everything())
+
+```
+
+```{r make excel sheet with coloured empty cells}
+
+library(openxlsx)
+
+# Define output path
+file_path <- "/Users/Accounttijdelijk/Desktop/datacleaningtable.xlsx"
+
+# Create a new workbook
+wb <- createWorkbook()
+
+# Add a worksheet
+addWorksheet(wb, "Data")
+
+# Write the dataframe
+writeData(wb, "Data", datacleaningtable)
+
+# Define a red style for empty cells
+red_style <- createStyle(fontColour = "#9C0006", bgFill = "#FFC7CE") 
+
+# Find empty cells (either "" or NA)
+empty_cells <- which(datacleaningtable == "" | is.na(datacleaningtable), arr.ind = TRUE)
+
+# Apply the style to each empty cell
+for (i in seq_len(nrow(empty_cells))) {
+  row <- empty_cells[i, 1] + 1   # +1 because of header row
+  col <- empty_cells[i, 2]
+  addStyle(wb, sheet = "Data", style = red_style, rows = row, cols = col, gridExpand = TRUE)
 }
 
-# Apply merging function to move columns under existing ones
-datacleaningtable <- datacleaningtable %>%
-  merge_into_existing_column("error", c("question")) %>%
-  merge_into_existing_column("artform", c("art_making", "illustration_of_essence", "skill_transfer")) %>%
-  merge_into_existing_column("theory", c("educational_theory", "scientific_explanation", "educational_the"))
+# Save the Excel file
+saveWorkbook(wb, file_path, overwrite = TRUE)
 
-# Display updated dataset
-print(datacleaningtable %>% select(error, artform, theory), width = Inf)
-```
-
-```{r rename columns}
-
-# Define the desired column order (assuming the dataframe already has 'author' as desired)
-desired_order <- c("title", "author", "collected", "NoTag", "source", 
-                   "objectives", "methods", "data_collection", "number", "participants", 
-                   "data_analysis", "case", "disciplines", "location", "educationtype", 
-                   "business_context", "artform", "reason_art", "learning_outcome", 
-                   "outcome_organisation", "theory", "interesting_perspective", 
-                   "consideration_research", "consideration_teaching", "consideration_business", 
-                   "recommendation_teaching", "recommendation_business", 
-                   "recommendation_research", "limitations", "future_research")
-
-# Reorder columns with the unmentioned ones appended at the end.
-datacleaningtable20250402 <- datacleaningtable %>%
-  select(all_of(intersect(desired_order, colnames(.))),
-         everything())
-
-# Remove duplicate columns in case any appear twice.
-datacleaningtable20250402 <- datacleaningtable20250402[, !duplicated(names(datacleaningtable20250402))]
-
-# Display the updated dataframe
-print(datacleaningtable20250402, width = Inf)
+cat("Excel file saved to:", normalizePath(file_path), "\n")
 
 ```
 
 ```{r}
-# Load the necessary package
-library(openxlsx)
 
-# Define the file path
-file_path <- "/Users/Accounttijdelijk/Desktop/datacleaningtable20250402.xlsx"
-
-# Create a new workbook and add a worksheet
-wb <- createWorkbook()
-addWorksheet(wb, "Sheet1")
-
-# Write the data to the worksheet
-writeData(wb, sheet = "Sheet1", datacleaningtable20250402)
-
-# Define style for NA or empty cells
-na_style <- createStyle(fgFill = "#FFD1D1")  # light red background
-
-# Loop through each cell and apply style if it's NA or empty string
-for (i in 1:nrow(datacleaningtable20250402)) {
-  for (j in 1:ncol(datacleaningtable20250402)) {
-    value <- datacleaningtable20250402[i, j]
-    if (is.na(value) || trimws(as.character(value)) == "") {
-      addStyle(wb, sheet = "Sheet1", style = na_style, rows = i + 1, cols = j, gridExpand = TRUE)
-    }
-  }
-}
-
-# Save the workbook
-saveWorkbook(wb, file = file_path, overwrite = TRUE)
-
-# Confirm the file was saved
-cat("File saved to:", file_path)
 
 
 ```
