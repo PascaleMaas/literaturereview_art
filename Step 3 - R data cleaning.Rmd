@@ -236,12 +236,77 @@ saveWorkbook(wb, file_path, overwrite = TRUE)
 cat("Excel file saved to:", normalizePath(file_path), "\n")
 
 ```
+########## after the filling is complete
 
-```{r}
+##### storage and cleaning
+
+# Upload Zotero tag export long data file to OSF
+## Save Zotero tag export long data frame to local processed_data_dir folder
+```{r save_data}
+
+# Define the full path for the output CSV file
+output_file <- file.path(processed_data_dir, "Complete_SynthesisTable.csv")
+
+write.csv(datacleaningtable,output_file,row.names=FALSE)
+```
+
+## Upload Zotero tag export long file from local processed_data_dir to folder to OSF
+```{r file-to-osf, message=FALSE, include=FALSE}
+
+# List all CSV files in processed_data_dir
+csv_files <- list.files(processed_data_dir, pattern = "\\.csv$", full.names = TRUE)
+
+# upload the first csv file if there are many
+if (length(csv_files) == 0) {
+  stop("No CSV files found in processed_data_dir.")
+} else {
+  file_to_upload <- csv_files[1]
+}
 
 
+# Retrieve the processed_data node's meta data from OSF
+# ## Processed_data Node OSF project: Master Thesis: https://osf.io/e4rdh/
+# Art project https://osf.io/akgf2/
+procdata<- osf_retrieve_node(processed_data_node_id)
+osf_upload(procdata, path = file_to_upload, conflicts = "overwrite")
 
 ```
 
+# Housekeeping
 
+## Delete files in local temp folder
+```{r Remove-local-temp-files,warning=FALSE, include=FALSE,  message=FALSE,eval=TRUE}
+# Pattern to match (e.g. all files that start with "SLR_")
+# file_pattern <- "^SLR_.*"
+ file_pattern <- "*.*"
 
+# List all files in temp directories that match this pattern
+raw_data_dir_files <- list.files(
+  path = raw_data_dir,
+  pattern = file_pattern,
+  full.names = TRUE
+)
+
+processed_data_dir_files <- list.files(
+  path = processed_data_dir,
+  pattern = file_pattern,
+  full.names = TRUE
+)
+
+# Remove them
+file.remove(raw_data_dir_files)
+file.remove(processed_data_dir_files)
+
+```
+
+## Delete local directories
+```{r delete-temp-directories}
+# Delete the raw_data_dir directory and its contents
+# unlink(file.path(tempdir(), "raw_data_dir"), recursive = TRUE)
+unlink(raw_data_dir, recursive = TRUE)
+
+# Delete the processed_data_dir directory and its contents
+# unlink(file.path(tempdir(), "processed_data_dir"), recursive = TRUE)
+unlink(processed_data_dir, recursive = TRUE)
+
+```
