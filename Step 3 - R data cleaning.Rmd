@@ -139,21 +139,29 @@ datacleaningtable <- datacleaningtable[, order(colnames(datacleaningtable))]
 ```{r merge to new}
 
 # Define column groups for merging
-columns_methods <- c("method_qualitative","method_quantitative", "method_mixed")
+columns_methods <- c("method_qualitative","method_quantitative", "method_mixed", "method_qualitative_interpreted")
 
-columns_disciplines <- c("discipline_accountant", "discipline_arts","discipline_economics", "discipline_entrepreneurship", "discipline_ethics", "discipline_interdisciplinairy", "discipline_innovation", "discipline_leadership", "discipline_management", "discipline_marketing", "discipline_sustainability", "discipline_strategy", "discipline_changemanagement")
+columns_disciplines <- c("discipline_accountant", "discipline_arts","discipline_economics", "discipline_entrepreneurship", "discipline_ethics", "discipline_interdisciplinairy", "discipline_innovation", "discipline_leadership", "discipline_management", "discipline_marketing", "discipline_sustainability", "discipline_strategy", "discipline_changemanagement", "discipline_supplychain", "discipline_HR", "discipline_organisational")
 
 columns_context <- c("business_context", "higher_education")
 
 columns_objectives <- c("aim", "research_question", "hypothesis")
 
-columns_locations <- c("location_europe", "location_nordamerica", "location_asia", "location_southamerica", "location_online", "location_australia", "location_europe_secundary")
+columns_locations <- c("location_europe", "location_nordamerica", "location_asia", "location_southamerica", "location_online", "location_australia", "location_europe_secundary", "location_nordamerica_secundary", "location_southamerica_secundary", "location_africa")
 
-columns_intergration <- c("artsrelated", "artsbased", "artsinformed")
+columns_intergration <- c("artsrelated", "artsbased", "artsinformed", "intergration_unclear")
 
 columns_results <- c("result_teaching", "result_proces", "result_motivation", 
                      "result_outcome", "result_perspective", 
                      "result_organisational_outcome")
+
+columns_arts_forms <- c("art_making", "artform", "form_diverse", 
+                     "form_multimedia", "form_narrative", "form_theatre", 
+                     "form_visual")
+
+columns_arts_reasons <- c("reason_art", "reason_artmaking", "reason_multimedia", "reason_music", 
+                     "reason_narrative", "reason_theatre", "reason_theatre", 
+                     "reason_visual")
 
 
 # Function to merge selected columns into one while keeping column names
@@ -173,19 +181,20 @@ datacleaningtable <- datacleaningtable %>%
   merge_columns("objectives", columns_objectives) %>%
   merge_columns("locations", columns_locations) %>%
   merge_columns("intergration", columns_intergration) %>%
-  merge_columns("results", columns_results)
+  merge_columns("results", columns_results) %>%
+  merge_columns("arts_forms", columns_arts_forms) %>%
+  merge_columns("arts_reasons", columns_arts_reasons) %>%
 
 # Display only the all newly created columns
 print(datacleaningtable %>% select(methods, disciplines, context, 
-                                   objectives, locations, intergration, results), width = Inf)
-
+                                   objectives, locations, intergration, results, arts_forms,   arts_reasons), width = Inf)
 ```
 
 
 ```{r reorder}
 # Reorder columns: title first, then the merged ones, then everything else
 new_cols <- c("methods", "disciplines", "context", 
-              "objectives", "locations", "intergration", "results")
+              "objectives", "locations", "intergration", "results", "arts_forms", "arts_reasons")
 
 datacleaningtable <- datacleaningtable %>%
   select(title, author, all_of(new_cols), everything())
@@ -197,7 +206,7 @@ datacleaningtable <- datacleaningtable %>%
 library(openxlsx)
 
 # Define output path
-file_path <- "/Users/Accounttijdelijk/Desktop/datacleaningtable.xlsx"
+file_path <- "/Users/Accounttijdelijk/Desktop/datacompletion15.9.2025.xlsx"
 
 # Create a new workbook
 wb <- createWorkbook()
