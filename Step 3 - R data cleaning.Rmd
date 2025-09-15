@@ -136,12 +136,13 @@ datacleaningtable <- datacleaningtable[, order(colnames(datacleaningtable))]
 
 ```
 
+
 ```{r merge to new}
 
 # Define column groups for merging
 columns_methods <- c("method_qualitative","method_quantitative", "method_mixed", "method_qualitative_interpreted")
 
-columns_disciplines <- c("discipline_accountant", "discipline_arts","discipline_economics", "discipline_entrepreneurship", "discipline_ethics", "discipline_interdisciplinairy", "discipline_innovation", "discipline_leadership", "discipline_management", "discipline_marketing", "discipline_sustainability", "discipline_strategy", "discipline_changemanagement", "discipline_supplychain", "discipline_HR", "discipline_organisational")
+columns_disciplines <- c("discipline_accountant", "discipline_arts","discipline_economics", "discipline_entrepreneurship", "discipline_ethics", "discipline_interdisciplinairy", "discipline_innovation", "discipline_leadership", "discipline_management", "discipline_marketing", "discipline_sustainability", "discipline_strategy", "discipline_changemanagement", "discipline_supplychain", "discipline_HR", "discipline_organisational", "discipline_ICT")
 
 columns_context <- c("business_context", "higher_education")
 
@@ -157,11 +158,9 @@ columns_results <- c("result_teaching", "result_proces", "result_motivation",
 
 columns_arts_forms <- c("art_making", "artform", "form_diverse", 
                      "form_multimedia", "form_narrative", "form_theatre", 
-                     "form_visual")
+                     "form_visual", "form_music")
 
-columns_arts_reasons <- c("reason_art", "reason_artmaking", "reason_multimedia", "reason_music", 
-                     "reason_narrative", "reason_theatre", "reason_theatre", 
-                     "reason_visual")
+columns_arts_reasons <- c("reason_art", "reason_artmaking", "reason_multimedia", "reason_music", "reason_narrative", "reason_theatre", "reason_theatre", "reason_visual")
 
 
 # Function to merge selected columns into one while keeping column names
@@ -203,37 +202,37 @@ datacleaningtable <- datacleaningtable %>%
 
 ```{r make excel sheet with coloured empty cells}
 
-library(openxlsx)
+#library(openxlsx)
 
-# Define output path
-file_path <- "/Users/Accounttijdelijk/Desktop/datacompletion15.9.2025.xlsx"
+## Define output path
+#file_path <- "/Users/Accounttijdelijk/Desktop/datacompletion1.9.2025.xlsx"
 
-# Create a new workbook
-wb <- createWorkbook()
+## Create a new workbook
+#wb <- createWorkbook()
 
-# Add a worksheet
-addWorksheet(wb, "Data")
+## Add a worksheet
+#addWorksheet(wb, "Data")
 
-# Write the dataframe
-writeData(wb, "Data", datacleaningtable)
+## Write the dataframe
+#writeData(wb, "Data", datacleaningtable)
 
-# Define a red style for empty cells
-red_style <- createStyle(fontColour = "#9C0006", bgFill = "#FFC7CE") 
+## Define a red style for empty cells
+#red_style <- createStyle(fontColour = "#9C0006", bgFill = "#FFC7CE") 
 
-# Find empty cells (either "" or NA)
-empty_cells <- which(datacleaningtable == "" | is.na(datacleaningtable), arr.ind = TRUE)
+## Find empty cells (either "" or NA)
+#empty_cells <- which(datacleaningtable == "" | is.na(datacleaningtable), arr.ind = TRUE)
 
 # Apply the style to each empty cell
-for (i in seq_len(nrow(empty_cells))) {
-  row <- empty_cells[i, 1] + 1   # +1 because of header row
-  col <- empty_cells[i, 2]
-  addStyle(wb, sheet = "Data", style = red_style, rows = row, cols = col, gridExpand = TRUE)
-}
+#for (i in seq_len(nrow(empty_cells))) {
+  #row <- empty_cells[i, 1] + 1   # +1 because of header row
+  #col <- empty_cells[i, 2]
+  #addStyle(wb, sheet = "Data", style = red_style, rows = row, cols = col, gridExpand = TRUE)
+#}
 
 # Save the Excel file
-saveWorkbook(wb, file_path, overwrite = TRUE)
+#saveWorkbook(wb, file_path, overwrite = TRUE)
 
-cat("Excel file saved to:", normalizePath(file_path), "\n")
+#cat("Excel file saved to:", normalizePath(file_path), "\n")
 
 ```
 ########## after the filling is complete

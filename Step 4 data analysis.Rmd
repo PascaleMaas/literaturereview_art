@@ -1,0 +1,413 @@
+---
+title: "Step 4 - Data analysis"
+  input: 
+  output:
+---
+
+# Global settings
+
+## Clear work space and set global variables
+```{r global-options}
+# Clear memory
+rm(list=ls()) # Clear environmental variables
+gc() # memory garbage removal
+# set global options
+knitr::opts_chunk$set(fig.width=12, fig.height=8, warning=FALSE, message=FALSE)
+
+```
+
+## Load libaries 
+```{r load-packages}
+if(!require("pacman", quietly=T)) install.packages("pacman")
+pacman::p_load(osfr,tinytex,tidyverse,keyring,knitr,readxl,data.table,colorspace, lpSolve,irr,here,lme4,broom,psych,zoo,units,ggdist,cowplot,ggcorrplot,dplyr, patchwork, cowplot, ggpmisc, forcats, pwr, ggpmisc, simstudy, explore, car,VIM,mice,flextable,here, remotes,magrittr,reshape2,descr,table1,tableone,gmodels,xtable,lavaan,corrplot,caret,corrgram,Hmisc,polycor,lavaan,kableExtra,DiagrammeR,grid,Gmisc,epitools)
+```
+
+
+## Set up local tempfolder for raw and processed data files
+```{r local-tempfolder}
+# Get the path to the session's temporary directory
+session_temp_dir <- tempdir()
+
+# Define paths for the specific temporary subdirectories
+raw_data_dir <- file.path(session_temp_dir, "raw_data")
+processed_data_dir <- file.path(session_temp_dir, "processed_data")
+
+# Create the 'raw_data' subdirectory if it doesn't exist
+if (!dir.exists(raw_data_dir)) {
+  dir.create(raw_data_dir)
+}
+
+# Create the 'processed_data' subdirectory if it doesn't exist
+if (!dir.exists(processed_data_dir)) {
+  dir.create(processed_data_dir)
+}
+
+ 
+```
+
+## Authenticate R to OSF connection
+```{r osf-authentication}
+osf_auth(keyring :: key_get("osf"))
+```
+## OSF nodes
+```{r OSF-nodes}
+
+# Define OSF node IDs at the beginning
+# raw_data_node_id <- "yxsqb"   # Master Thesis Raw Data Node or other Raw Data Node
+# raw_data_node_id <- "gpj2v"  # https://osf.io/gpj2v/ Quantify Occupational Injury
+ raw_data_node_id <- "dpgby"  # https://osf.io/dpgby/ Art Business Education
+# raw_data_node_id <- "z6jfn" # https://osf.io/z6jfn/ Housing prices
+# raw_data_node_id <- "gu7ny" # https://osf.io/gu7ny/ Hmm53a-2425-GR1
+# raw_data_node_id <- "prw4a" # https://osf.io/prw4a/ Hmm53a-2425-GR2
+# raw_data_node_id <- "gxw3v" # https://osf.io/gxw3v/ Hmm53a-2425-GR3
+
+# processed_data_node_id <- "e4rdh"  # Master Thesis Processed Data Node 
+# processed_data_node_id <- "q4wgm"  # https://osf.io/q4wgm/ Quantify Occupational Injury
+ processed_data_node_id <- "akgf2"  # https://osf.io/akgf2/ Art Business Education
+# processed_data_node_id <- "6heqg"  # https://osf.io/6heqg/ Housing prices
+# processed_data_node_id <- "76tn5"  # https://osf.io/76tn5/ Hmm53a-2425-GR1
+# processed_data_node_id <- "ab6hg"  # https://osf.io/ab6hg/ Hmm53a-2425-GR2
+# processed_data_node_id <- "tyhbk"  # https://osf.io/tyhbk/ Hmm53a-2425-GR3 
+```
+
+# Download Zotero_tag_export_long.csv 
+```{r get-processed-data-osf, echo=TRUE, include=TRUE, results='hide'}
+
+osf_retrieve_node(processed_data_node_id) %>%
+  osf_ls_files(pattern = "Complete_SynthesisTable.csv") %>%
+   osf_download(path = raw_data_dir, conflicts="overwrite",progress=TRUE)
+```
+
+## Load Zotero tag export file into R data frame
+```{r list-csv-files}
+
+csv_file <- list.files(path = raw_data_dir, pattern = "\\.csv$", full.names = TRUE)
+
+if (length(csv_file) == 0) {
+  stop("Error: No csv file found in the specified directory.")
+}
+
+
+
+# standard pathname
+csv_file[1] <- file.path(dirname(csv_file[1]), basename(csv_file[1]))
+if (!file.exists(csv_file[1])) {
+  stop("File does not exist. Check the path.")
+}
+
+print(csv_file)
+```
+
+# Select first CSV file
+
+```{r load-csv-file}
+# Read the Markdown file
+Complete_SynthesisTable <- read.csv(csv_file[1], encoding = "UTF-8")
+
+# Check if the file is empty
+if (length(Complete_SynthesisTable) == 0) {
+  stop("Error: The csv file is empty.")
+}
+```
+
+```{r count number of rows}
+
+data.frame(total_rows = nrow(Complete_SynthesisTable))
+
+```
+
+
+```{r count context}
+library(dplyr)
+library(ggplot2)
+
+# Count occurrences of higher_education, business_context, and both
+context_counts <- Complete_SynthesisTable %>%
+  mutate(
+    context_category = case_when(
+      grepl("higher_education", context) & grepl("business_context", context) ~ "both",
+      grepl("higher_education", context) ~ "higher_education",
+      grepl("business_context", context) ~ "business_context",
+      TRUE ~ "other"
+    )
+  ) %>%
+  count(context_category)
+
+# Print the table
+print(context_counts)
+
+# Make a bar plot
+ggplot(context_counts, aes(x = context_category, y = n, fill = context_category)) +
+  geom_col(show.legend = FALSE) +
+  labs(
+    title = "Occurrences of Context Categories",
+    x = "Context Category",
+    y = "Count"
+  ) +
+  theme_minimal()
+```
+
+```{r check both}
+
+both_titles <- Complete_SynthesisTable %>%
+  mutate(
+    context_category = case_when(
+      grepl("higher_education", context) & grepl("business_context", context) ~ "both",
+      grepl("higher_education", context) ~ "higher_education",
+      grepl("business_context", context) ~ "business_context",
+      TRUE ~ "other"
+    )
+  ) %>%
+  filter(context_category == "both") %>%
+  select(title)
+
+print(both_titles)
+
+```
+
+
+
+```{r count methods}
+library(dplyr)
+library(ggplot2)
+
+methods_counts <- Complete_SynthesisTable %>%
+  mutate(
+    method_category = case_when(
+      grepl("method_mixed", methods) ~ "method_mixed",
+      grepl("method_quantitative", methods) & grepl("method_qualitative", methods) ~ "method_mixed",
+      grepl("method_qualitative_interpreted", methods) ~ "method_qualitative",
+      grepl("method_qualitative", methods) ~ "method_qualitative",
+      grepl("method_quantitative", methods) ~ "method_quantitative",
+      TRUE ~ NA_character_   # instead of "other"
+    )
+  ) %>%
+  filter(!is.na(method_category)) %>%   # remove NAs
+  count(method_category)
+
+# Print the table
+print(methods_counts)
+
+# Bar plot (ordered by count, descending)
+ggplot(methods_counts, aes(x = reorder(method_category, -n), y = n, fill = method_category)) +
+  geom_col(show.legend = FALSE) +
+  labs(
+    title = "Occurrences of Method Categories",
+    x = "Method Category",
+    y = "Count"
+  ) +
+  theme_minimal()
+
+```
+```{r}
+library(dplyr)
+
+mixed_titles <- Complete_SynthesisTable %>%
+  mutate(
+    method_category = case_when(
+      grepl("method_mixed", methods) ~ "method_mixed",
+      grepl("method_quantitative", methods) & grepl("method_qualitative", methods) ~ "method_mixed",
+      grepl("method_qualitative_interpreted", methods) ~ "method_qualitative",
+      grepl("method_qualitative", methods) ~ "method_qualitative",
+      grepl("method_quantitative", methods) ~ "method_quantitative",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  filter(method_category == "method_mixed") %>%
+  select(title)
+
+print(mixed_titles)
+```
+
+```{r count disciplines}
+library(dplyr)
+library(stringr)
+library(tidyr)
+
+# Define the list of disciplines to count
+disciplines_to_count <- c(
+  "discipline_accountant",
+  "discipline_arts",
+  "discipline_economics",
+  "discipline_entrepreneurship",
+  "discipline_ethics",
+  "discipline_interdisciplinairy",
+  "discipline_innovation",
+  "discipline_leadership",
+  "discipline_management",
+  "discipline_marketing",
+  "discipline_sustainability",
+  "discipline_strategy",
+  "discipline_changemanagement",
+  "discipline_supplychain",
+  "discipline_HR",
+  "discipline_organisational", 
+  "discipline_ICT"
+)
+
+# Expand the dataframe so each discipline per row
+disciplines_counts <- Complete_SynthesisTable %>%
+  mutate(disciplines_split = str_extract_all(disciplines, paste(disciplines_to_count, collapse="|"))) %>%
+  unnest(disciplines_split) %>%
+  distinct() %>%  # remove duplicates
+  group_by(row_id = row_number()) %>%  # temporary row id
+  mutate(
+    drop_management = "discipline_management" %in% disciplines_split & length(disciplines_split) > 1
+  ) %>%
+  ungroup() %>%
+  filter(!(disciplines_split == "discipline_management" & drop_management)) %>%
+  count(disciplines_split, name = "n")
+
+# Print counts
+print(disciplines_counts)
+
+# Plot
+ggplot(disciplines_counts, aes(x = reorder(disciplines_split, -n), y = n, fill = disciplines_split)) +
+  geom_col(show.legend = FALSE) +
+  labs(
+    title = "Occurrences of Disciplines",
+    x = "Discipline",
+    y = "Count"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r count locations}
+library(dplyr)
+library(stringr)
+library(tidyr)
+library(ggplot2)
+
+# Define all location keywords
+locations_to_count <- c(
+  "location_europe",
+  "location_nordamerica",
+  "location_asia",
+  "location_southamerica",
+  "location_online",
+  "location_australia",
+  "location_europe_secundary",
+  "location_nordamerica_secundary",
+  "location_southamerica_secundary",
+  "location_africa"
+)
+
+# Expand the dataframe so each location per row and recode secundary
+locations_counts <- Complete_SynthesisTable %>%
+  mutate(locations_split = str_extract_all(locations, paste(locations_to_count, collapse="|"))) %>%
+  unnest(locations_split) %>%
+  mutate(
+    location_clean = case_when(
+      locations_split == "location_nordamerica_secundary" ~ "location_nordamerica",
+      locations_split == "location_southamerica_secundary" ~ "location_southamerica",
+      locations_split == "location_europe_secundary" ~ "location_europe",
+      TRUE ~ locations_split
+    )
+  ) %>%
+  count(location_clean, name = "n")
+
+# Print counts
+print(locations_counts)
+
+# Plot
+ggplot(locations_counts, aes(x = reorder(location_clean, -n), y = n, fill = location_clean)) +
+  geom_col(show.legend = FALSE) +
+  labs(
+    title = "Occurrences of Locations",
+    x = "Location",
+    y = "Count"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r integration}
+library(dplyr)
+library(stringr)
+library(ggplot2)
+
+# Define integration keywords
+integration_to_count <- c("artsrelated", "artsbased", "artsinformed", "intergration_unclear")
+
+# Detect integration types per row and collapse into a single category
+integration_counts <- Complete_SynthesisTable %>%
+  mutate(
+    integration_found = str_extract_all(intergration, paste(integration_to_count, collapse="|")),
+    integration_category = case_when(
+      lengths(integration_found) == 0 ~ NA_character_,
+      lengths(integration_found) == 1 ~ sapply(integration_found, `[`, 1),
+      lengths(integration_found) > 1 ~ "both"
+    )
+  ) %>%
+  filter(!is.na(integration_category)) %>%
+  count(integration_category, name = "n")
+
+# Print counts
+print(integration_counts)
+
+# Plot
+ggplot(integration_counts, aes(x = reorder(integration_category, -n), y = n, fill = integration_category)) +
+  geom_col(show.legend = FALSE) +
+  labs(
+    title = "Occurrences of Integration Types",
+    x = "Integration Type",
+    y = "Count"
+  ) +
+  theme_minimal()
+
+
+```
+
+```{r}
+library(dplyr)
+library(stringr)
+
+both_titles_integration <- Complete_SynthesisTable %>%
+  mutate(
+    integration_found = str_extract_all(intergration, paste(integration_to_count, collapse="|")),
+    integration_category = case_when(
+      lengths(integration_found) == 0 ~ NA_character_,
+      lengths(integration_found) == 1 ~ sapply(integration_found, `[`, 1),
+      lengths(integration_found) > 1 ~ "both"
+    )
+  ) %>%
+  filter(integration_category == "both") %>%
+  select(title)
+
+print(both_titles_integration)
+```
+
+
+```{r arts_form}
+
+library(dplyr)
+library(stringr)
+library(tidyr)
+
+# All tokens to count (including form_music)
+forms_all <- c(
+  "artform", "form_diverse", "form_multimedia", 
+  "form_narrative", "form_theatre", "form_visual", "form_music"
+)
+
+# Simple pattern to find any of the tokens
+pattern <- str_c(forms_all, collapse = "|")
+
+# Count each form once per row, even if multiple appear
+arts_forms_counts_all <- Complete_SynthesisTable %>%
+  mutate(
+    arts_forms   = coalesce(arts_forms, ""),                  # handle NA
+    row_id       = row_number(),
+    forms_found  = str_extract_all(arts_forms, pattern)       # list of matches per row
+  ) %>%
+  mutate(forms_found = lapply(forms_found, unique)) %>%       # don't double-count same form within a row
+  unnest(forms_found) %>%                                     # one row per (row_id, form)
+  count(forms_found, name = "n") %>%                          # total rows where each form appears
+  arrange(desc(n))
+
+print(arts_forms_counts_all)
+
+```
